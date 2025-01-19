@@ -1,6 +1,6 @@
 # Welcome to my Mineweeper game!
 
-This game was suprisingly easy to make given my experience with C and Qt Creator's amazing features. 
+The game is basically done, with small but necessary final touches inbound. It was suprisingly easy to make given my experience with C and Qt Creator's amazing features. 
 
 A lot of the juicy code is in [<code>mainwindow.cpp</code>](mainwindow.cpp), should you care to take a gander.
 
