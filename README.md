@@ -1,4 +1,4 @@
-# Welcome to my Mineweeper Game!
+# Welcome to my Mineweeper game!
 
 This game was suprisingly easy to make given my experience with C and Qt Creator's amazing features. 
 
