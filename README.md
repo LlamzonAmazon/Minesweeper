@@ -2,7 +2,7 @@
 
 This game was suprisingly easy to make given my experience with C and Qt Creator's amazing features. 
 
-A lot of the juicy code is in mainwindow.cpp, should you care to take a gander.
+A lot of the juicy code is in [<code>mainwindow.cpp</code>](mainwindow.cpp), should you care to take a gander.
 
 ## TODO
 
