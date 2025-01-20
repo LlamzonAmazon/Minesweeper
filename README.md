@@ -7,8 +7,9 @@ A lot of the juicy code is in [<code>mainwindow.cpp</code>](mainwindow.cpp), sho
 ## TODO
 
 <ol>
+  <li>Modularize mainwindow.cpp</li>
+  <li>Improve documentation</li>
   <li>Bundle project for user-friendly use</li>
-  <li>***Improve documentation***</li>
   <li>Add scoreboard</li>
   <li>Make game win scenario</li>
 </ol>
