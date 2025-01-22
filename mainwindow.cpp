@@ -1,195 +1,206 @@
 #include "mainwindow.h"
+#include "tile.h"
 #include "./ui_mainwindow.h"
+#include <QDebug>
 #include <QGridLayout>
+#include <QFrame>
+#include <QTextLayout>
 #include <QMessageBox>
-#include <QRandomGenerator64>
+#include <QRandomGenerator>
 
-/* Constructor */
+int flagCount;
+
+/**
+ * @brief MainWindow::MainWindow - constructor for the main window; initializes grid layout.
+ * @param parent - widget containing the window.
+ */
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent)
-    , ui(new Ui::MainWindow)
-    , buttons(16) {
+    : QMainWindow(parent), NUM_MINES(15), NUM_ROWS(16), NUM_COLS(30), flagCount(0), ui(new Ui::MainWindow) {
     ui->setupUi(this);
+
+    tiles.resize(NUM_ROWS);
+    for (int i = 0; i < NUM_ROWS; ++i)
+        tiles[i].resize(NUM_COLS);
+
     createGrid();
 }
 
-/* Destructor */
+/**
+ * @brief MainWindow::~MainWindow - destructor.
+ */
 MainWindow::~MainWindow() {
     delete ui;
 }
 
-/* Create grid layout */
-QGridLayout *layout;
-QVector<QVector<QPushButton*>> buttons;
-QVector<QVector<QPushButton*>> mines;
+/**
+ * @brief MainWindow::createGrid - initializes the minefield, creating tiles, filling the tiles vector, and adding listeners to buttons.
+ *
+ */
 void MainWindow::createGrid() {
 
     QFrame *frame = new QFrame(this);
-    layout = new QGridLayout(frame);
+    QGridLayout *layout = new QGridLayout(frame);
+    layout->setSpacing(2);
 
-    layout->setContentsMargins(0, 0, 0, 0);
-    layout->setSpacing(5);
+    for (int i = 0; i < NUM_ROWS; ++i) {
+        for (int j = 0; j < NUM_COLS; ++j) {
 
-    buttons.resize(16);
-    for (int i = 0; i < 16; ++i) {
-        buttons[i].resize(30);
-    }
+            Tile *tile = new Tile(this, i, j);
+            layout->addWidget(tile, i, j); // Add the Tile directly (no button member)
 
-    for (int i = 0; i < 16; ++i) {
-        for (int j = 0; j < 30; ++j) {
-            QPushButton *button = new QPushButton();
-            button->setMinimumSize(40, 40);
-            button->setMaximumSize(40, 40);
+            tiles[i][j] = tile;
 
-            layout->addWidget(button, i, j);
-            buttons[i][j] = button;
-            buttons[i][j]->setProperty("adjMines", 0);
-            buttons[i][j]->setProperty("isMine", false);
-            buttons[i][j]->setProperty("flagged", false);
-
-            // Listening for specific mouse click event
-            button->installEventFilter(this);
+            // Connect the tileClicked signal to MainWindow handleTileClick slot
+            connect(tile, &Tile::tileClicked, this, &MainWindow::handleTileClick);
         }
     }
 
     setMines();
-
     setCentralWidget(frame);
 }
 
-/* Randomly set mines on the grid */
-const int NUM_MINES = 75;
+/**
+ * @name restartGame
+ * @brief Restarts the game by recreating the MainWindow.
+ */
+void MainWindow::restartGame() {
+    QMessageBox::StandardButton reply = QMessageBox::question(
+        this, "Restart Game", "You hit a mine! Do you want to restart?",
+        QMessageBox::Yes | QMessageBox::No
+        );
+
+    if (reply == QMessageBox::Yes) {
+        // Close the current window
+        this->close();
+
+        // Create a new MainWindow instance
+        MainWindow *newGame = new MainWindow();
+        newGame->show();
+    }
+}
+
+/**
+ * @brief MainWindow::setMines - randomly sets mines across the grid.
+ */
 void MainWindow::setMines() {
 
     for (int i = 0; i < NUM_MINES; ++i) {
+        int rRow = QRandomGenerator::global()->bounded(0, NUM_ROWS-1);
+        int rCol = QRandomGenerator::global()->bounded(0, NUM_COLS-1);
 
-        int randRow;
-        int randCol;
-
-        while (buttons[randRow][randCol]->property("isMine").toBool()) {
-            randRow = QRandomGenerator::global()->bounded(16);
-            randCol = QRandomGenerator::global()->bounded(30);
+        while (tiles[rRow][rCol]->isMine()) {
+            rRow = QRandomGenerator::global()->bounded(0, NUM_ROWS-1);
+            rCol = QRandomGenerator::global()->bounded(0, NUM_COLS-1);
         }
 
+        tiles[rRow][rCol]->setMine(true);
 
-        buttons[randRow][randCol]->setProperty("isMine", true);
-        // buttons[randRow][randCol]->setText("💣"); // DEBUG
-
-        // Increment adjMine values for all tiles surrounding the mine
-        for (int j = -1; j <= 1; ++j) {
+        for (int j = -1; j <= 1; ++ j) {
             for (int k = -1; k <= 1; ++k) {
-                if (j == 0 && k == 0) continue; // Ignore this tile
-                if (randRow+j < 0 || randCol+k < 0 || randRow+j >= buttons.size() || randCol+k >= buttons[0].size()) continue; // Ignore out of bounds indices
 
-                if (buttons[randRow+j][randCol+k]->property("isMine") == false)
-                    buttons[randRow+j][randCol+k]->setProperty("adjMines", buttons[randRow+j][randCol+k]->property("adjMines").toInt()+1);
-            }
-        }
-    }
-}
+                if (j == 0 && k == 0)
+                    continue;
 
-/* Check left click or right click */
-bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
+                else if (rRow+j < 0 || rCol+k < 0 || rRow+j >= NUM_ROWS || rCol+k >= NUM_COLS)
+                    continue;
 
-    if (event->type() == QEvent::MouseButtonPress) {
-        QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
-        QPushButton *button = qobject_cast<QPushButton *>(obj);
-
-        if (button) {
-            for (int i = 0; i < 16; ++i) {
-                for (int j = 0; j < 30; ++j) {
-
-                    if (buttons[i][j] == button) {
-
-                        if (mouseEvent->button() == Qt::LeftButton) handleLeftClick(i, j);
-                        else if (mouseEvent->button() == Qt::RightButton) handleRightClick(i, j);
-
-                        return false;
-                    }
+                else {
+                    if (!tiles[rRow+j][rCol+k]->isMine())
+                        tiles[rRow+j][rCol+k]->setMineCount(tiles[rRow+j][rCol+k]->getMineCount()+1);
                 }
             }
         }
-    }
 
-    return QObject::eventFilter(obj, event);
+    }
 }
 
-void MainWindow::handleLeftClick(int row, int col) {
-    QPushButton *button = buttons[row][col]; // Create pointer to point to clicked button using the buttons 2D vector
+/**
+ * @brief MainWindow::leftClick
+ * @param row
+ * @param col
+ */
+void MainWindow::leftClick(int row, int col) {
 
-    if (button->property("flagged").toBool()) return; // Do nothing on left click if tile is flagged
+    Tile *tile = tiles[row][col];
 
-    // Check if this button is a mine
-    if (button->property("isMine") == true) {
+    if (tile->isFlagged()) { // Flagged tile
+        return;
 
-        // Disable all buttons and reveal mines
-        for (int i = 0; i < 16; ++i) {
-            for (int j = 0; j < 30; ++j) {
+    } else if (tile->isMine()) { // Tile is a mine
 
-                buttons[i][j]->setEnabled(false);
+        for (int i = 0; i < NUM_ROWS; ++i) {
+            for (int j = 0; j < NUM_COLS; ++j) {
 
-                if (buttons[i][j]->property("flagged").toBool()) // Tile flagged --> leave flag
-                    continue;
-                if (buttons[i][j]->property("isMine").toBool()) // Tile is mine --> Reveal mine
-                    buttons[i][j]->setText("💣");
+                tiles[i][j]->setEnabled(false);
+
+                if (tiles[i][j]->isMine())
+                    tiles[i][j]->setText("💣");
             }
         }
 
-        QMessageBox::information(this, "Game Over", "You hit a mine! I'll give you another life though.");
+        restartGame();
 
-        // Reset minefield
-        for (int i = 0; i < 16; ++i) {
-            for (int j = 0; j < 30; ++j) {
+    } else if (tile->getMineCount() > 0) { // Tile touching a mine
+        tile->setText(QString::number(tile->getMineCount()));
+        tile->setRevealed(true);
 
-                buttons[i][j]->setEnabled(true);
+    } else { // Tile not touching a mine
+        tile->sweep(row, col);
+    }
+}
 
-                if (buttons[i][j]->property("isMine").toBool() && !buttons[i][j]->property("flagged").toBool())
-                    buttons[i][j]->setText("");
+/**
+ * @brief MainWindow::rightClick
+ * @param row
+ * @param col
+ */
+void MainWindow::rightClick(int row, int col) {
+
+    if (tiles[row][col]->isRevealed()) return; // Do nothing if tile is already revealed
+
+    Tile *tile = tiles[row][col];
+    tile->setFlag(!tile->isFlagged());
+
+    if (tile->isFlagged()) {
+
+        tile->setText("🚩");
+        flagCount++;
+
+        if (tile->isMine() && flagCount >= NUM_MINES) {
+            QMessageBox::information(this, "GAME WIN", "Congratulations! You didn't die! 🎉");
+
+            for (int i = 0; i < NUM_ROWS; ++i) {
+                for (int j = 0; j < NUM_COLS; ++j) {
+                    tiles[i][j]->setEnabled(false);
+                }
             }
         }
 
     } else {
-        sweep(row, col);
+        tile->setText("");
+        flagCount--;
     }
 }
 
-/* Clear safe tiles */
-void MainWindow::sweep(int row, int col) {
-
-    if (row < 0 || col < 0 || row > 15 || col > 29) return; // Do not perform this function on out of bounds indices.
-    if (!buttons[row][col]->isEnabled()) return; // Do not perform this function on cleared tiles.
-
-    if (buttons[row][col]->property("adjMines").toInt() == 0) {
-
-        buttons[row][col]->setEnabled(false);
-
-        for (int r = -1; r <= 1; r++) {
-            for (int c = -1; c <= 1; c++) {
-                if (r == 0 && c == 0) continue;
-
-                sweep(row+r, col+c);
-            }
-        }
-    }
-    else {
-        buttons[row][col]->setText(buttons[row][col]->property("adjMines").toString());
-    }
+/**
+ * @brief getTiles returns the tiles 2D Vector containing all of the tiles on the grid.
+ * @return tiles
+ */
+QVector<QVector<Tile *>> &MainWindow::getTiles() {
+    return tiles;
 }
 
-/* Set/Remove flag */
-int flags = NUM_MINES;
-void MainWindow::handleRightClick(int row, int col) {
+/**
+ * @brief MainWindow::handleTileClick - performs a set of actions based off whether the click was a left or right click.
+ * @param row - row of click.
+ * @param col - column of click.
+ * @param button - button that was clicked.
+ */
+void MainWindow::handleTileClick(int row, int col, Qt::MouseButton button) {
 
-    if (!buttons[row][col]->property("flagged").toBool()) {
-        // Not flagged --> Set flag
-        buttons[row][col]->setProperty("flagged", true);
-        buttons[row][col]->setText("🚩");
-        flags++;
-    }
-    else {
-        // Flagged --> Remove flag
-        buttons[row][col]->setProperty("flagged", false);
-        buttons[row][col]->setText("");
-        flags--;
-    }
+    if (tiles[row][col]->isRevealed()) return;
+    else if (button == Qt::LeftButton) leftClick(row, col);
+    else if (button == Qt::RightButton) rightClick(row, col);
 }
+
+

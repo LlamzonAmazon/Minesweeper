@@ -2,12 +2,7 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include <QPushButton>
 #include <QVector>
-#include <QGridLayout>
-#include <QFrame>
-#include <QMouseEvent>
-
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -15,27 +10,36 @@ class MainWindow;
 }
 QT_END_NAMESPACE
 
-class MainWindow : public QMainWindow
-{
+class Tile;
+
+
+class MainWindow : public QMainWindow {
     Q_OBJECT
 
 public:
+    const int NUM_MINES;
+    const int NUM_ROWS;
+    const int NUM_COLS;
+
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
+
+    void createGrid();
+    void restartGame();
+    void setMines();
+    void leftClick(int row, int col);
+    void rightClick(int row, int col);
+    QVector<QVector<Tile *>> &getTiles();
+
+public slots:
+    void handleTileClick(int row, int col, Qt::MouseButton mb);
 
 private:
     Ui::MainWindow *ui;
 
-    QVector<QVector<QPushButton*>> buttons;
-    QGridLayout *layout;
-    void createGrid();
-    void setMines();
-    bool eventFilter(QObject *obj, QEvent *event) override;
-
-private slots:
-    void handleLeftClick(int row, int col);
-    void sweep(int row, int col);
-    void handleRightClick(int row, int col);
+    static int clearedTiles;
+    QVector<QVector<Tile *>> tiles;
+    int flagCount;
 };
 
 #endif // MAINWINDOW_H
