@@ -1,6 +1,6 @@
 .qtcreator
 .DS_Store
-.CMakeLists.txt.user
+CMakeLists.txt.user
 build/
 *.log
 
