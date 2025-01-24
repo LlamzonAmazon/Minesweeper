@@ -31,6 +31,9 @@ public:
     void rightClick(int row, int col);
     QVector<QVector<Tile *>> &getTiles();
 
+    int getClearCount();
+    void setClearCount(int c);
+
 public slots:
     void handleTileClick(int row, int col, Qt::MouseButton mb);
 
@@ -39,7 +42,7 @@ private:
 
     static int clearedTiles;
     QVector<QVector<Tile *>> tiles;
-    int flagCount;
+    int clearCount;
 };
 
 #endif // MAINWINDOW_H

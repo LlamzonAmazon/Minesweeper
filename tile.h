@@ -12,12 +12,14 @@ class Tile : public QPushButton {
 public:
     explicit Tile(MainWindow *par, int r, int c);
 
-    void sweep(int row, int col); // Function to handle revealing surrounding tiles
+    bool sweep(int row, int col); // Function to handle revealing surrounding tiles
+
     int getRow();
     int getCol();
     int getMineCount();
     bool isMine();
     bool isFlagged();
+    bool isBelieved();
     bool isRevealed();
 
     void setRow(int r);
@@ -25,6 +27,7 @@ public:
     void setMineCount(int count);
     void setMine(bool m);
     void setFlag(bool flag);
+    void setBelieved(bool b);
     void setRevealed(bool rev);
 
 signals:
@@ -37,6 +40,7 @@ private:
     int surrMines;
     bool mine;
     bool flagged;
+    bool believed;
     bool revealed;
 
 protected:
