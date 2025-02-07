@@ -1,7 +1,5 @@
 #include "tile.h"
 #include "mainwindow.h"
-#include <QMouseEvent>
-#include <QMessageBox>
 
 MainWindow *parent;
 int row;
@@ -14,11 +12,22 @@ bool revealed;
 QVector<QVector<Tile *>> tiles;
 
 /**
+ * @file tile.cpp
+ * @brief This class represents every tile on the grid.
+ *
+ * This class handles behaviours pertaining to how buttons/tiles perform,
+ * such as left & right click behaviour and recursive grid tile clearing (sweeping).
+ *
+ * @author Thomas Llamzon | 251316111 | TLLAMZON
+ * @date Feb 1, 2025
+ */
+
+/**
  * @name Tile
- * @brief Tile::Tile is a constructor for Tile objects.
- * @param par - parent (MainWindow)
- * @param r - int row coordinate
- * @param c - int column coordinate
+ * @brief Constructs a Tile object.
+ * @param par Pointer to the parent MainWindow.
+ * @param r Row index of the tile.
+ * @param c Column index of the tile.
  */
 Tile::Tile(MainWindow *par, int r, int c)
     : parent(par), row(r), col(c), surrMines(0), mine(false), flagged(false), revealed(false) {
@@ -28,79 +37,84 @@ Tile::Tile(MainWindow *par, int r, int c)
 
 /**
  * @name sweep
- * @brief Tile::sweep "sweeps" the minefield; disables tiles not touching mines and revealing those that are.
- * @param row - int row coordinate
- * @param col - int column coordinate
+ * @brief Reveals tiles recursively based on their distance from mines on the grid.
+ * @param row Row index of the tile.
+ * @param col Column index of the tile.
+ * @return True if all non-mine tiles are cleared; otherwise, false.
  */
 bool Tile::sweep(int row, int col) {
-
     QVector<QVector<Tile *>> &tiles = parent->getTiles();
 
-    // Ignore revealed tiles and out of bounds indices
-    if (row < 0 || col < 0 || row >= parent->NUM_ROWS || col >= parent->NUM_COLS) return false;
+    // Ignore out-of-bounds indices or already revealed tiles.
+    if (row < 0 || col < 0 || row >= parent->getROW() || col >= parent->getCOL()) return false;
     if (tiles[row][col]->isRevealed()) return false;
 
     Tile *tile = tiles[row][col];
+    parent->setClearCount(parent->getClearCount() + 1); // Increment cleared tile count.
 
-    parent->setClearCount(parent->getClearCount()+1); // Increment clearCount for every tile swept
-
-    if (tile->getMineCount() == 0) { // Tile not touching a mine
+    if (tile->getMineCount() == 0) { // If the tile is not touching any mines.
 
         tile->setRevealed(true);
-        tile->setEnabled(false);
 
+        if (tile->isBelieved()) tile->setText("");
+
+        tile->setVisible(false);
+
+        // Recursively process surrounding tiles.
         for (int r = -1; r <= 1; ++r) {
             for (int c = -1; c <= 1; ++c) {
-                if (r == 0 && c == 0) continue;
 
-                sweep(row+r, col+c);
+                if (r == 0 && c == 0) continue; // Skip the current tile.
+
+                sweep(row + r, col + c);
             }
         }
-
-    } else { // Tile touching a mine
+    } else { // Tile is touching one or more mines.
+        tile->setIcon(QIcon());
         tile->setText(QString::number(tile->getMineCount()));
         tile->setRevealed(true);
     }
 
-    // Always check after sweeping if all the tiles have been cleared
-    if (parent->getClearCount() >= ((parent->NUM_ROWS * parent->NUM_COLS) - parent->NUM_MINES))
+    // Check if all non-mine tiles have been cleared.
+    if (parent->getClearCount() >= ((parent->getROW() * parent->getCOL()) - parent->getMINES()))
         return true;
     return false;
 }
 
 /**
  * @name leftClick
- * @brief MainWindow::leftClick handles action upon left-clicking a tile.
- * @param row
- * @param col
- *
- * This function is included in tile.cpp because the left-click action is primarily related to the properties of tiles.
+ * @brief Handles actions when a tile is left-clicked.
+ * @param row Row index of the clicked tile.
+ * @param col Column index of the clicked tile.
  */
 void MainWindow::leftClick(int row, int col) {
+    if (tiles[row][col]->isFlagged()) return; // Ignore flagged tiles.
 
     Tile *tile = tiles[row][col];
     bool gameWin = false;
 
-    if (tile->isMine()) {
-        if (tile->isFlagged()) return;
+    if (tile->isMine()) { // If the clicked tile is a mine, end the game.
+
+        QIcon bomb(":/tileIcons/icons/bomb.png");
 
         for (int i = 0; i < NUM_ROWS; ++i) {
             for (int j = 0; j < NUM_COLS; ++j) {
 
-                tiles[i][j]->setEnabled(false);
-
                 if (tiles[i][j]->isMine())
-                    tiles[i][j]->setText("💣");
+                    tiles[i][j]->setIcon(bomb);
+
+                tiles[i][j]->setEnabled(false);
             }
         }
 
-        QMessageBox::information(this, "GAME LOSE", "Oh no! You hit a mine! 💣");
-        restartGame();
+        QMessageBox::information(this, "GAME LOSE", "Oh no! You hit a mine!");
 
+        restartGame();
     } else gameWin = tile->sweep(row, col);
 
-    if (gameWin) {
-        QMessageBox::information(this, "GAME WIN", "Congratulations! You didn't die! 🎉");
+    if (gameWin) { // If the player wins the game.
+
+        QMessageBox::information(this, "GAME WIN", "Congratulations! You didn't die!");
 
         for (int i = 0; i < NUM_ROWS; ++i) {
             for (int j = 0; j < NUM_COLS; ++j) {
@@ -114,168 +128,147 @@ void MainWindow::leftClick(int row, int col) {
 
 /**
  * @name rightClick
- * @brief MainWindow::rightClick handles action upon right-clicking a tile.
- * @param row
- * @param col
- *
- * This function is included in tile.cpp because the right-click action is primarily related to the properties of tiles.
+ * @brief Handles actions when a tile is right-clicked.
+ * @param row Row index of the clicked tile.
+ * @param col Column index of the clicked tile.
  */
 void MainWindow::rightClick(int row, int col) {
-
-    if (tiles[row][col]->isRevealed()) return; // Do nothing if tile is already revealed
+    if (tiles[row][col]->isRevealed()) return; // Ignore revealed tiles.
 
     Tile *tile = tiles[row][col];
 
-    if (!tile->isFlagged() && !tile->isBelieved()) { // Nothing —> Flag
+    if (!tile->isFlagged() && !tile->isBelieved()) { // No mark -> Flag.
         tile->setFlag(true);
 
-    } else if (tile->isFlagged() && !tile->isBelieved()) { // Flag —> Question mark
+    } else if (tile->isFlagged() && !tile->isBelieved()) { // Flag -> Question mark.
         tile->setFlag(false);
         tile->setBelieved(true);
 
-    } else if (!tile->isFlagged() && tile->isBelieved()) { // Question mark —> Nothing
+    } else if (!tile->isFlagged() && tile->isBelieved()) { // Question mark -> No mark.
         tile->setBelieved(false);
     }
 }
 
 /**
- * @name Tile::mousePressEvent
- * @brief Overrides the mousePressEvent to handle left and right clicks
+ * @name mousePressEvent
+ * @brief Captures mouse click events on the tile and emits the appropriate signal.
+ * @param event Mouse event data.
  */
 void Tile::mousePressEvent(QMouseEvent *event) {
-    emit tileClicked(row, col, event->button()); // Emit signal with row, col, and button info
-    QPushButton::mousePressEvent(event); // Call default QPushButton behavior
+    emit tileClicked(row, col, event->button()); // Emit signal with row, col, and button info.
+    QPushButton::mousePressEvent(event); // Call base class behavior.
 }
 
 
-// ================================= GETTERS & SETTERS ==================================================================
+// ================================= GETTERS & SETTERS ==================================
 
 /**
+ *
  * @name getRow
- * @brief Tile::getRow returns the row coordinate of this tile.
- * @return int row coordinate
+ * @brief Gets the row index of the tile.
+ * @return Row index of the tile.
  */
-int Tile::getRow() {
-    return row;
-}
+int Tile::getRow() { return row; }
 
 /**
  * @name getCol
- * @brief Tile::getCol returns the column coordinate of this tile.
- * @return int columns coordinate
+ * @brief Gets the column index of the tile.
+ * @return Column index of the tile.
  */
-int Tile::getCol() {
-    return col;
-}
+int Tile::getCol() { return col; }
 
 /**
  * @name getMineCount
- * @brief Tile::getMineCount returns the number of mines touching this tile.
- * @return int number of mines touching this tile.
+ * @brief Gets the number of surrounding mines.
+ * @return Number of surrounding mines.
  */
-int Tile::getMineCount() {
-    return surrMines;
-}
+int Tile::getMineCount() { return surrMines; }
 
 /**
  * @name isMine
- * @brief Tile::isMine returns whether or not this tile is a mine.
- * @return bool whether or not this tile is a mine.
+ * @brief Checks if the tile is a mine.
+ * @return True if the tile is a mine; otherwise, false.
  */
-bool Tile::isMine() {
-    return mine;
-}
+bool Tile::isMine() { return mine; }
 
 /**
  * @name isFlagged
- * @brief Tile::isFlagged returns the flag status of this tile.
- * @return bool flag status.
+ * @brief Checks if the tile is flagged.
+ * @return True if the tile is flagged; otherwise, false.
  */
-bool Tile::isFlagged() {
-    return flagged;
-}
+bool Tile::isFlagged() { return flagged; }
 
 /**
  * @name isBelieved
- * @brief Tile::isBelieved
- * @return
+ * @brief Checks if the tile is marked with a question mark.
+ * @return True if the tile is marked as believed; otherwise, false.
  */
-bool Tile::isBelieved() {
-    return believed;
-}
+bool Tile::isBelieved() { return believed; }
 
 /**
  * @name isRevealed
- * @brief Tile::isRevealed returnes whether or not this tile is revealed.
- * @return revealed status.
+ * @brief Checks if the tile is revealed.
+ * @return True if the tile is revealed; otherwise, false.
  */
-bool Tile::isRevealed() {
-    return revealed;
-}
+bool Tile::isRevealed() { return revealed; }
 
 /**
  * @name setRow
- * @brief Tile::setRow sets the row coordinate of this tile.
- * @param r - row coordinate.
+ * @brief Sets the row index of the tile.
+ * @param r Row index to set.
  */
-void Tile::setRow(int r) {
-    row = r;
-}
+void Tile::setRow(int r) { row = r; }
 
 /**
  * @name setCol
- * @brief Tile::setCol sets the column coordinate of this tile.
- * @param c - column coordinate.
+ * @brief Sets the column index of the tile.
+ * @param c Column index to set.
  */
-void Tile::setCol(int c) {
-    col = c;
-}
+void Tile::setCol(int c) { col = c; }
 
 /**
  * @name setMineCount
- * @brief Tile::setMineCount sets the number of mines touching this tile.
- * @param count - number of mines touching this tile.
+ * @brief Sets the number of surrounding mines.
+ * @param count Number of mines to set.
  */
-void Tile::setMineCount(int count) {
-    surrMines = count;
-}
+void Tile::setMineCount(int count) { surrMines = count; }
 
 /**
  * @name setMine
- * @brief Tile::setMine makes a certain tile a mine.
- * @param mine - true/false.
+ * @brief Marks the tile as a mine.
+ * @param m True if the tile is a mine; otherwise, false.
  */
-void Tile::setMine(bool m) {
-    mine = m;
-}
+void Tile::setMine(bool m) { mine = m; }
 
 /**
  * @name setFlag
- * @brief Tile::setFlag flags a tile.
- * @param flag - true/false.
+ * @brief Flags or unflags the tile.
+ * @param flag True to flag the tile; false to unflag it.
  */
 void Tile::setFlag(bool flag) {
     flagged = flag;
-    if (flagged) this->setText("🚩");
-    else this->setText("");
+    if (flagged) {
+        this->setIcon(QIcon(":/tileIcons/icons/flag.png"));
+    }
+    else this->setIcon(QIcon());
 }
 
 /**
  * @name setBelieved
- * @brief Tile::setBelieved allows the user to mark suspected mines.
- * @param b
+ * @brief Marks or unmarks the tile with a question mark.
+ * @param b True to mark the tile; false to unmark it.
  */
 void Tile::setBelieved(bool b) {
     believed = b;
-    if (believed) this->setText("❓");
-    else this->setText("");
+    if (believed) {
+        this->setIcon(QIcon(":/tileIcons/icons/qmark.png"));
+    }
+    else this->setIcon(QIcon());
 }
 
 /**
  * @name setRevealed
- * @brief Tile::setRevealed tells the tile whether or not it is revealed
- * @param rev - true/false
+ * @brief Sets the revealed state of the tile.
+ * @param rev True to reveal the tile; false to hide it.
  */
-void Tile::setRevealed(bool rev) {
-    revealed = rev;
-}
+void Tile::setRevealed(bool rev) { revealed = rev; }

@@ -1,0 +1,7 @@
+<RCC>
+    <qresource prefix="/tileIcons">
+        <file>icons/bomb.png</file>
+        <file>icons/flag.png</file>
+        <file>icons/qmark.png</file>
+    </qresource>
+</RCC>
