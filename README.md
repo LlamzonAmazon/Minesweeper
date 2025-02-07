@@ -1,4 +1,4 @@
-### Welcome to my Minesweeper Game!
+# Welcome to my Minesweeper Game!
 
 To Do:
 - Make standalone macOS and Windows builds
